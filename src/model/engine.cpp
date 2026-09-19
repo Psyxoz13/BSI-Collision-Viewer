@@ -132,6 +132,41 @@ CharacterSnapshot Engine::readCharacters(const std::vector<uint32_t>& cylinders)
     return snapshot;
 }
 
+PlayerState Engine::readPlayerState()
+{
+    constexpr float StandingStill = 1;
+    PlayerState state;
+    uint32_t pawn = reflection.field<uint32_t>(playerController(), "Pawn");
+    if (pawn == 0)
+    {
+        peakSpeed_ = peakVerticalSpeed_ = 0;
+        return state;
+    }
+    Float3 velocity = reflection.field<Float3>(pawn, "Velocity");
+    state.speed = sqrtf(velocity.x * velocity.x + velocity.y * velocity.y);
+    state.verticalSpeed = velocity.z;
+    if (state.speed < StandingStill && fabsf(state.verticalSpeed) < StandingStill)
+    {
+        peakSpeed_ = peakVerticalSpeed_ = 0;
+    }
+    peakSpeed_ = std::max(peakSpeed_, state.speed);
+    peakVerticalSpeed_ = std::max(peakVerticalSpeed_, state.verticalSpeed);
+    state.peakSpeed = peakSpeed_;
+    state.peakVerticalSpeed = peakVerticalSpeed_;
+    state.valid = true;
+
+    state.physics = reflection.field<uint8_t>(pawn, "Physics");
+    state.collidesWithWorld = reflection.flag(pawn, "bCollideWorld");
+    if (uint32_t cylinder = reflection.field<uint32_t>(pawn, "CylinderComponent"); cylinder != 0)
+    {
+        state.collisionRadius = reflection.field<float>(cylinder, "CollisionRadius");
+        state.collisionHeight = reflection.field<float>(cylinder, "CollisionHeight");
+        Matrix toWorld = reflection.field<Matrix>(cylinder, "LocalToWorld");
+        state.position = Float3(toWorld._41, toWorld._42, toWorld._43);
+    }
+    return state;
+}
+
 Matrix Engine::componentMatrix(uint32_t component)
 {
     return mul(reflection.field<Matrix>(component, "LocalToWorld"), scaling(MetersPerUnit, MetersPerUnit, MetersPerUnit));

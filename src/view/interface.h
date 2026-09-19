@@ -1,6 +1,7 @@
 #pragma once
 
 #include "input/hotkeys.h"
+#include "model/engine.h"
 #include "model/settings.h"
 
 struct Statistics
@@ -42,4 +43,34 @@ private:
     Settings& settings_;
     Hotkeys& hotkeys_;
     Statistics statistics_ = {};
+};
+
+class PlayerStateSettingsPanel : public Panel
+{
+public:
+    PlayerStateSettingsPanel(Settings& settings, Hotkeys& hotkeys);
+
+    void draw();
+
+private:
+    void place() const override;
+    void body() override;
+
+    Settings& settings_;
+    Hotkeys& hotkeys_;
+};
+
+class PlayerStatePanel : public Panel
+{
+public:
+    explicit PlayerStatePanel(const Settings& settings);
+
+    void draw(const PlayerState& state);
+
+private:
+    void place() const override;
+    void body() override;
+
+    const Settings& settings_;
+    PlayerState state_;
 };

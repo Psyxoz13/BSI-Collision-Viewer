@@ -7,6 +7,13 @@
 
 namespace
 {
+    const char* physicsName(uint8_t physics)
+    {
+        static const char* const names[] = {"none", "walking", "falling", "swimming", "flying", "rotating", "projectile",
+                                            "interpolating", "spider", "ladder", "rigid body", "soft body", "navmesh"};
+        return physics < std::size(names) ? names[physics] : "custom";
+    }
+
     void slider(const char* label, float& value, ValueRange range, const char* format = "%.3f", int flags = 0)
     {
         ImGui::SliderFloat(label, &value, range.minimum, range.maximum, format, flags);
@@ -49,6 +56,15 @@ namespace
         }
         ImGui::ColorEdit3(KindLabels[kind], &settings.colors[kind].x, ImGuiColorEditFlags_NoInputs);
         ImGui::PopID();
+    }
+
+    template <class... Values>
+    void playerStateRow(const Settings& settings, PlayerStateRow row, const char* format, Values... values)
+    {
+        if (settings.shows(row))
+        {
+            ImGui::Text(format, values...);
+        }
     }
 }
 
@@ -116,4 +132,71 @@ void SettingsPanel::body()
     ImGui::Separator();
     ImGui::TextDisabled("%d triangles, %d moving objects, %d characters", statistics_.triangles, statistics_.movingObjects,
                         statistics_.characters);
+}
+
+PlayerStateSettingsPanel::PlayerStateSettingsPanel(Settings& settings, Hotkeys& hotkeys)
+    : Panel("Player state panel", ImGuiWindowFlags_AlwaysAutoResize), settings_(settings), hotkeys_(hotkeys)
+{
+}
+
+void PlayerStateSettingsPanel::draw()
+{
+    render();
+}
+
+void PlayerStateSettingsPanel::place() const
+{
+    ImGui::SetNextWindowPos(ImVec2(560, 40), ImGuiCond_FirstUseEver);
+}
+
+void PlayerStateSettingsPanel::body()
+{
+    hotkeyToggle("Show", settings_.playerStateKey, settings_.playerStatePanel);
+    ImGui::SetItemTooltip("The player's speed, read from the pawn every frame");
+    hotkeyButton(hotkeys_, "Hotkey", settings_.playerStateKey);
+    slider("Panel X", settings_.playerStatePanelX, Settings::PanelPositionRange, "%.2f");
+    slider("Panel Y", settings_.playerStatePanelY, Settings::PanelPositionRange, "%.2f");
+    ImGui::SeparatorText("Rows");
+    for (int r = 0; r < PlayerStateRowCount; r++)
+    {
+        ImGui::PushID(r);
+        ImGui::Checkbox(PlayerStateRowLabels[r], &settings_.playerStateRows[r]);
+        ImGui::PopID();
+    }
+}
+
+PlayerStatePanel::PlayerStatePanel(const Settings& settings)
+    : Panel("Player state", ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                          ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs),
+      settings_(settings)
+{
+}
+
+void PlayerStatePanel::draw(const PlayerState& state)
+{
+    state_ = state;
+    render();
+}
+
+void PlayerStatePanel::place() const
+{
+    ImVec2 screen = ImGui::GetIO().DisplaySize;
+    ImVec2 pivot(settings_.playerStatePanelX, settings_.playerStatePanelY);
+    ImGui::SetNextWindowPos(ImVec2(pivot.x * screen.x, pivot.y * screen.y), ImGuiCond_Always, pivot);
+    ImGui::SetNextWindowBgAlpha(0.4f);
+}
+
+void PlayerStatePanel::body()
+{
+    if (!state_.valid)
+    {
+        ImGui::TextUnformatted("waiting for the player...");
+        return;
+    }
+    playerStateRow(settings_, PlayerStateRow::Speed, "speed    %7.0f   peak %7.0f", state_.speed, state_.peakSpeed);
+    playerStateRow(settings_, PlayerStateRow::Speed, "up       %+7.0f   peak %7.0f", state_.verticalSpeed, state_.peakVerticalSpeed);
+    playerStateRow(settings_, PlayerStateRow::Physics, "physics  %s", physicsName(state_.physics));
+    playerStateRow(settings_, PlayerStateRow::WorldCollision, "collides world %d", state_.collidesWithWorld);
+    playerStateRow(settings_, PlayerStateRow::Cylinder, "cylinder radius %.0f   height %.0f", state_.collisionRadius, state_.collisionHeight);
+    playerStateRow(settings_, PlayerStateRow::Position, "position %8.0f %8.0f %8.0f", state_.position.x, state_.position.y, state_.position.z);
 }
