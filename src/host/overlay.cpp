@@ -45,6 +45,8 @@ namespace
     Scene g_scene;
     Hotkeys g_hotkeys;
     SettingsPanel g_settingsPanel(g_settings, g_hotkeys);
+    PlayerStateSettingsPanel g_playerStateSettingsPanel(g_settings, g_hotkeys);
+    PlayerStatePanel g_playerStatePanel(g_settings);
 
     const std::wstring& settingsPath()
     {
@@ -214,6 +216,7 @@ namespace
         bool focused = GetForegroundWindow() == g_window;
         bool toggleOverlay = g_hotkeys.pressed(g_settings.overlayKey);
         bool toggleMenu = g_hotkeys.pressed(g_settings.menuKey);
+        bool togglePlayerState = g_hotkeys.pressed(g_settings.playerStateKey);
         if (!focused)
         {
             if (isInputLocked())
@@ -229,6 +232,11 @@ namespace
         if (toggleOverlay)
         {
             g_settings.enabled = !g_settings.enabled;
+            saveSettings(g_settings, settingsPath());
+        }
+        if (togglePlayerState)
+        {
+            g_settings.playerStatePanel = !g_settings.playerStatePanel;
             saveSettings(g_settings, settingsPath());
         }
         if (toggleMenu)
@@ -260,7 +268,7 @@ namespace
         }
     }
 
-    void drawInterface(ID3D11RenderTargetView* target, int characters)
+    void drawInterface(ID3D11RenderTargetView* target, int characters, const PlayerState& state)
     {
         std::lock_guard lock(g_imguiMutex);
         ImGui_ImplDX11_NewFrame();
@@ -276,10 +284,15 @@ namespace
             {
                 g_hotkeys.capture();
             }
+            g_playerStateSettingsPanel.draw();
             if (!g_settingsPanel.draw({g_scene.triangleCount(), g_scene.trackedObjectCount(), characters}))
             {
                 setMenuOpen(false);
             }
+        }
+        if (g_settings.playerStatePanel)
+        {
+            g_playerStatePanel.draw(state);
         }
         ImGui::Render();
         g_context->OMSetRenderTargets(1, &target, nullptr);
@@ -305,12 +318,24 @@ namespace
     {
         handleHotkeys();
         takePendingScene();
-        if (!g_settings.enabled && !isInputLocked())
+        if (!g_settings.enabled && !g_settings.playerStatePanel && !isInputLocked())
         {
             return;
         }
         CharacterSnapshot characters;
+        PlayerState playerState;
         std::optional<CameraPose> camera;
+        if (Game* game = g_game; game && g_settings.playerStatePanel)
+        {
+            try
+            {
+                playerState = game->engine.readPlayerState();
+            }
+            catch (const std::exception& e)
+            {
+                report("the player state", e);
+            }
+        }
         if (Game* game = g_game; game && g_settings.enabled)
         {
             game->track(g_scene);
@@ -341,7 +366,7 @@ namespace
         {
             g_renderer->draw(g_context.Get(), target.Get(), desc, g_scene, characters, *camera, g_settings);
         }
-        drawInterface(target.Get(), characters.count);
+        drawInterface(target.Get(), characters.count, playerState);
     }
 
     bool isGameDevice(ID3D11Device* device)

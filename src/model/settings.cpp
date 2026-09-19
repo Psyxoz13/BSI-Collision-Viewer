@@ -5,6 +5,8 @@
 #include <cwchar>
 #include <format>
 
+const char* const PlayerStateRowLabels[PlayerStateRowCount] = {"Speed", "Physics state", "World collision", "Player cylinder", "Position"};
+
 namespace
 {
     constexpr wchar_t Section[] = L"CollisionViewer";
@@ -56,8 +58,11 @@ void Settings::normalize()
     fadeStart = FadeStartRange.clamp(fadeStart, defaults.fadeStart);
     fadeEnd = std::max(FadeEndRange.clamp(fadeEnd, defaults.fadeEnd), fadeStart + 1);
     fovScale = FovScaleRange.clamp(fovScale, defaults.fovScale);
+    playerStatePanelX = PanelPositionRange.clamp(playerStatePanelX, defaults.playerStatePanelX);
+    playerStatePanelY = PanelPositionRange.clamp(playerStatePanelY, defaults.playerStatePanelY);
     overlayKey = isKeyboardKey(overlayKey) ? overlayKey : defaults.overlayKey;
     menuKey = isKeyboardKey(menuKey) ? menuKey : defaults.menuKey;
+    playerStateKey = isKeyboardKey(playerStateKey) ? playerStateKey : defaults.playerStateKey;
 }
 
 bool isKeyboardKey(int key)
@@ -84,8 +89,16 @@ Settings loadSettings(const std::wstring& path)
     settings.fadeStart = number(path, L"FadeStart", settings.fadeStart);
     settings.fadeEnd = number(path, L"FadeEnd", settings.fadeEnd);
     settings.fovScale = number(path, L"FovScale", settings.fovScale);
+    settings.playerStatePanel = number(path, L"PlayerStatePanel", settings.playerStatePanel) != 0;
+    for (int r = 0; r < PlayerStateRowCount; r++)
+    {
+        settings.playerStateRows[r] = number(path, std::format(L"PlayerStateRow{}", r), settings.playerStateRows[r]) != 0;
+    }
+    settings.playerStatePanelX = number(path, L"PlayerStatePanelX", settings.playerStatePanelX);
+    settings.playerStatePanelY = number(path, L"PlayerStatePanelY", settings.playerStatePanelY);
     settings.overlayKey = static_cast<int>(number(path, L"OverlayKey", static_cast<float>(settings.overlayKey)));
     settings.menuKey = static_cast<int>(number(path, L"MenuKey", static_cast<float>(settings.menuKey)));
+    settings.playerStateKey = static_cast<int>(number(path, L"PlayerStateKey", static_cast<float>(settings.playerStateKey)));
     settings.normalize();
     return settings;
 }
@@ -110,8 +123,16 @@ void saveSettings(const Settings& settings, const std::wstring& path)
     saved &= write(path, L"FadeStart", std::format(L"{}", settings.fadeStart));
     saved &= write(path, L"FadeEnd", std::format(L"{}", settings.fadeEnd));
     saved &= write(path, L"FovScale", std::format(L"{}", settings.fovScale));
+    saved &= write(path, L"PlayerStatePanel", settings.playerStatePanel ? L"1" : L"0");
+    for (int r = 0; r < PlayerStateRowCount; r++)
+    {
+        saved &= write(path, std::format(L"PlayerStateRow{}", r), settings.playerStateRows[r] ? L"1" : L"0");
+    }
+    saved &= write(path, L"PlayerStatePanelX", std::format(L"{}", settings.playerStatePanelX));
+    saved &= write(path, L"PlayerStatePanelY", std::format(L"{}", settings.playerStatePanelY));
     saved &= write(path, L"OverlayKey", std::to_wstring(settings.overlayKey));
     saved &= write(path, L"MenuKey", std::to_wstring(settings.menuKey));
+    saved &= write(path, L"PlayerStateKey", std::to_wstring(settings.playerStateKey));
     if (!saved)
     {
         logLine("the settings could not be saved beside d3d11.dll");
