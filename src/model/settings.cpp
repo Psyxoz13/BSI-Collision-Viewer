@@ -1,4 +1,4 @@
-#include "settings.h"
+#include "model/settings.h"
 
 #include <windows.h>
 

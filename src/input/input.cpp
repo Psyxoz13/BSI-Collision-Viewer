@@ -1,6 +1,6 @@
-#include "input.h"
+#include "input/input.h"
 
-#include "common.h"
+#include "core/common.h"
 
 #include <windows.h>
 

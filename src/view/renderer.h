@@ -1,7 +1,7 @@
 #pragma once
 
-#include "game.h"
-#include "settings.h"
+#include "model/engine.h"
+#include "model/settings.h"
 
 #include <d3d11.h>
 #include <wrl/client.h>
