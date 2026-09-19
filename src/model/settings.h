@@ -1,6 +1,6 @@
 #pragma once
 
-#include "collision.h"
+#include "model/collision.h"
 
 #include <windows.h>
 

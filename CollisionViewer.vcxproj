@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -43,7 +43,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -70,24 +70,33 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="src\collision.h" />
-    <ClInclude Include="src\common.h" />
-    <ClInclude Include="src\game.h" />
-    <ClInclude Include="src\input.h" />
-    <ClInclude Include="src\overlay.h" />
-    <ClInclude Include="src\renderer.h" />
-    <ClInclude Include="src\settings.h" />
+    <ClInclude Include="src\core\common.h" />
+    <ClInclude Include="src\host\overlay.h" />
+    <ClInclude Include="src\input\hotkeys.h" />
+    <ClInclude Include="src\input\input.h" />
+    <ClInclude Include="src\model\collision.h" />
+    <ClInclude Include="src\model\engine.h" />
+    <ClInclude Include="src\model\game.h" />
+    <ClInclude Include="src\model\physx.h" />
+    <ClInclude Include="src\model\reflection.h" />
+    <ClInclude Include="src\model\settings.h" />
+    <ClInclude Include="src\view\interface.h" />
+    <ClInclude Include="src\view\renderer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\collision.cpp" />
-    <ClCompile Include="src\common.cpp" />
-    <ClCompile Include="src\input.cpp" />
-    <ClCompile Include="src\overlay.cpp" />
-    <ClCompile Include="src\physx.cpp" />
-    <ClCompile Include="src\proxy.cpp" />
-    <ClCompile Include="src\renderer.cpp" />
-    <ClCompile Include="src\settings.cpp" />
-    <ClCompile Include="src\unreal.cpp" />
+    <ClCompile Include="src\core\common.cpp" />
+    <ClCompile Include="src\host\overlay.cpp" />
+    <ClCompile Include="src\host\proxy.cpp" />
+    <ClCompile Include="src\input\hotkeys.cpp" />
+    <ClCompile Include="src\input\input.cpp" />
+    <ClCompile Include="src\model\collision.cpp" />
+    <ClCompile Include="src\model\engine.cpp" />
+    <ClCompile Include="src\model\game.cpp" />
+    <ClCompile Include="src\model\physx.cpp" />
+    <ClCompile Include="src\model\reflection.cpp" />
+    <ClCompile Include="src\model\settings.cpp" />
+    <ClCompile Include="src\view\interface.cpp" />
+    <ClCompile Include="src\view\renderer.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp" />
     <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
     <ClCompile Include="third_party\imgui\imgui_tables.cpp" />

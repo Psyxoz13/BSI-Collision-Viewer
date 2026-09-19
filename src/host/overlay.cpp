@@ -1,10 +1,12 @@
-#include "overlay.h"
+#include "host/overlay.h"
 
-#include "common.h"
-#include "game.h"
-#include "input.h"
-#include "renderer.h"
-#include "settings.h"
+#include "core/common.h"
+#include "input/hotkeys.h"
+#include "input/input.h"
+#include "model/game.h"
+#include "model/settings.h"
+#include "view/interface.h"
+#include "view/renderer.h"
 
 #include <d3d11_1.h>
 #include <imgui.h>
@@ -41,6 +43,8 @@ namespace
     std::unique_ptr<Renderer> g_renderer;
     Settings g_settings;
     Scene g_scene;
+    Hotkeys g_hotkeys;
+    SettingsPanel g_settingsPanel(g_settings, g_hotkeys);
 
     const std::wstring& settingsPath()
     {
@@ -65,6 +69,26 @@ namespace
             }
         }
         logLine(text);
+    }
+
+    void buildStep(Game& game, std::optional<std::vector<ActorList>>& loaded)
+    {
+        try
+        {
+            std::vector<ActorList> signature = game.sceneSignature();
+            if (g_invalidated.exchange(false) || signature != loaded)
+            {
+                auto scene = std::make_unique<Scene>(game.buildCollision(signature));
+                logScene(*scene);
+                std::lock_guard lock(g_pendingMutex);
+                g_pendingScene = std::move(scene);
+                loaded = std::move(signature);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            report("building the collision", e);
+        }
     }
 
     void runWorker()
@@ -92,22 +116,7 @@ namespace
         std::optional<std::vector<ActorList>> loaded;
         for (;;)
         {
-            try
-            {
-                std::vector<ActorList> signature = game->sceneSignature();
-                if (g_invalidated.exchange(false) || signature != loaded)
-                {
-                    auto scene = std::make_unique<Scene>(game->buildCollision(signature));
-                    logScene(*scene);
-                    std::lock_guard lock(g_pendingMutex);
-                    g_pendingScene = std::move(scene);
-                    loaded = std::move(signature);
-                }
-            }
-            catch (const std::exception& e)
-            {
-                report("building the collision", e);
-            }
+            buildStep(*game, loaded);
             Sleep(500);
         }
     }
@@ -126,15 +135,6 @@ namespace
             }
         }
         return CallWindowProcW(g_gameWndProc, window, message, wParam, lParam);
-    }
-
-    std::string utf8(const std::wstring& text)
-    {
-        int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, nullptr, 0, nullptr, nullptr);
-        std::string result(size, '\0');
-        WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, result.data(), size, nullptr, nullptr);
-        result.pop_back();
-        return result;
     }
 
     void startInterface(HWND window, ID3D11Device* device, ID3D11DeviceContext* context)
@@ -199,32 +199,21 @@ namespace
         }
     }
 
-    bool g_keyDown[256];
-    int* g_bindingKey;
-
     void setMenuOpen(bool open)
     {
         setInputLocked(open);
-        g_bindingKey = nullptr;
+        g_hotkeys.stopBinding();
         if (!open)
         {
             saveSettings(g_settings, settingsPath());
         }
     }
 
-    bool wasPressed(int key)
-    {
-        bool isDown = (GetAsyncKeyState(key) & 0x8000) != 0;
-        bool pressed = isDown && !g_keyDown[key];
-        g_keyDown[key] = isDown;
-        return pressed;
-    }
-
     void handleHotkeys()
     {
         bool focused = GetForegroundWindow() == g_window;
-        bool toggleOverlay = wasPressed(g_settings.overlayKey);
-        bool toggleMenu = wasPressed(g_settings.menuKey);
+        bool toggleOverlay = g_hotkeys.pressed(g_settings.overlayKey);
+        bool toggleMenu = g_hotkeys.pressed(g_settings.menuKey);
         if (!focused)
         {
             if (isInputLocked())
@@ -233,7 +222,7 @@ namespace
             }
             return;
         }
-        if (g_bindingKey)
+        if (g_hotkeys.isBinding())
         {
             return;
         }
@@ -246,54 +235,6 @@ namespace
         {
             setMenuOpen(!isInputLocked());
         }
-    }
-
-    void captureBinding()
-    {
-        for (int key = VK_BACK; key <= 0xFE; key++)
-        {
-            if (!(GetAsyncKeyState(key) & 0x8000))
-            {
-                continue;
-            }
-            if (key != VK_ESCAPE)
-            {
-                *g_bindingKey = key;
-                g_keyDown[key] = true;
-            }
-            g_bindingKey = nullptr;
-            return;
-        }
-    }
-
-    std::string keyName(int key)
-    {
-        if ((key >= '0' && key <= '9') || (key >= 'A' && key <= 'Z'))
-        {
-            return std::string(1, static_cast<char>(key));
-        }
-        UINT scanCode = MapVirtualKeyW(key, MAPVK_VK_TO_VSC_EX);
-        LONG keyData = static_cast<LONG>(((scanCode & 0xFF) << 16) | ((scanCode & 0xFF00) ? 1 << 24 : 0));
-        wchar_t name[64] = {};
-        if (scanCode != 0 && GetKeyNameTextW(keyData, name, 64) > 0 &&
-            std::all_of(name, name + wcslen(name), [](wchar_t c) { return c < 128; }))
-        {
-            return utf8(name);
-        }
-        return std::format("Key {}", key);
-    }
-
-    void hotkeyButton(const char* label, int& key)
-    {
-        bool binding = g_bindingKey == &key;
-        std::string text = (binding ? std::string("Press a key...") : keyName(key)) + "###" + label;
-        if (ImGui::Button(text.c_str(), ImVec2(ImGui::GetFontSize() * 8, 0)))
-        {
-            g_bindingKey = binding ? nullptr : &key;
-        }
-        ImGui::SetItemTooltip("Click, then press the new key; Esc cancels");
-        ImGui::SameLine();
-        ImGui::TextUnformatted(label);
     }
 
     void takePendingScene()
@@ -319,76 +260,6 @@ namespace
         }
     }
 
-    struct Statistics
-    {
-        int triangles;
-        int movingObjects;
-        int characters;
-    };
-
-    bool drawSettingsPanel(Settings& settings, const Statistics& statistics)
-    {
-        static const char* const occlusionLabels[] = {"No occlusion", "Nearest collider", "Distance fade"};
-        ImGui::SetNextWindowPos(ImVec2(40, 40), ImGuiCond_FirstUseEver);
-        bool open = true;
-        if (ImGui::Begin("Collision viewer", &open, ImGuiWindowFlags_AlwaysAutoResize))
-        {
-            ImGui::Checkbox(std::format("Overlay ({})###overlay", keyName(settings.overlayKey)).c_str(), &settings.enabled);
-            int occlusion = static_cast<int>(settings.occlusion);
-            ImGui::Combo("Mode", &occlusion, occlusionLabels, 3);
-            settings.occlusion = static_cast<Occlusion>(occlusion);
-            ImGui::Checkbox("Faces", &settings.drawFaces);
-            ImGui::SameLine();
-            ImGui::Checkbox("Edges", &settings.drawEdges);
-            ImGui::SliderFloat("Face opacity", &settings.faceOpacity, Settings::OpacityRange.minimum, Settings::OpacityRange.maximum, "%.3f");
-            ImGui::SliderFloat("Edge opacity", &settings.edgeOpacity, Settings::OpacityRange.minimum, Settings::OpacityRange.maximum, "%.3f");
-            auto distanceSlider = [](const char* label, float& value, ValueRange range)
-            {
-                ImGui::SliderFloat(label, &value, range.minimum, range.maximum, "%.0f", ImGuiSliderFlags_Logarithmic);
-            };
-            if (settings.occlusion == Occlusion::DistanceFade)
-            {
-                distanceSlider("Fade start", settings.fadeStart, Settings::FadeStartRange);
-                distanceSlider("Fade end", settings.fadeEnd, Settings::FadeEndRange);
-                settings.fadeEnd = std::max(settings.fadeEnd, settings.fadeStart + 1);
-            }
-            else
-            {
-                distanceSlider("Draw distance", settings.drawDistance, Settings::DrawDistanceRange);
-            }
-            ImGui::SliderFloat("FOV scale", &settings.fovScale, Settings::FovScaleRange.minimum, Settings::FovScaleRange.maximum, "%.3f");
-
-            ImGui::SeparatorText("Hotkeys");
-            if (g_bindingKey)
-            {
-                captureBinding();
-            }
-            hotkeyButton("Overlay", settings.overlayKey);
-            hotkeyButton("Settings", settings.menuKey);
-
-            ImGui::SeparatorText("Shapes");
-            for (int k = 0; k < KindCount; k++)
-            {
-                ImGui::PushID(k);
-                ImGui::Checkbox("##show", &settings.visible[k]);
-                ImGui::SetItemTooltip("Draw this kind");
-                ImGui::SameLine();
-                if (settings.occlusion == Occlusion::NearestCollider)
-                {
-                    ImGui::Checkbox("##occlude", &settings.occluding[k]);
-                    ImGui::SetItemTooltip("Hide the collision behind this kind; it stays hidden by the others either way");
-                    ImGui::SameLine();
-                }
-                ImGui::ColorEdit3(KindLabels[k], &settings.colors[k].x, ImGuiColorEditFlags_NoInputs);
-                ImGui::PopID();
-            }
-            ImGui::Separator();
-            ImGui::TextDisabled("%d triangles, %d moving objects, %d characters", statistics.triangles, statistics.movingObjects, statistics.characters);
-        }
-        ImGui::End();
-        return open;
-    }
-
     void drawInterface(ID3D11RenderTargetView* target, int characters)
     {
         std::lock_guard lock(g_imguiMutex);
@@ -399,9 +270,16 @@ namespace
         io.MouseDrawCursor = menuOpen;
         io.FontGlobalScale = std::max(1.f, io.DisplaySize.y / 1080);
         ImGui::NewFrame();
-        if (menuOpen && !drawSettingsPanel(g_settings, {g_scene.triangleCount(), g_scene.trackedObjectCount(), characters}))
+        if (menuOpen)
         {
-            setMenuOpen(false);
+            if (g_hotkeys.isBinding())
+            {
+                g_hotkeys.capture();
+            }
+            if (!g_settingsPanel.draw({g_scene.triangleCount(), g_scene.trackedObjectCount(), characters}))
+            {
+                setMenuOpen(false);
+            }
         }
         ImGui::Render();
         g_context->OMSetRenderTargets(1, &target, nullptr);

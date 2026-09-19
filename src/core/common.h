@@ -50,6 +50,7 @@ void* patchPointer(void** slot, void* value);
 
 void check(long result, const char* what);
 
+std::string utf8(const std::wstring& text);
 const std::wstring& moduleDirectory();
 void logLine(const std::string& line);
 void report(const char* context, const std::exception& error);

@@ -1,4 +1,4 @@
-#include "common.h"
+#include "core/common.h"
 
 #include <windows.h>
 
@@ -74,6 +74,15 @@ void check(long result, const char* what)
     {
         throw std::runtime_error(std::format("{} failed (0x{:08x})", what, static_cast<unsigned long>(result)));
     }
+}
+
+std::string utf8(const std::wstring& text)
+{
+    int size = WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    std::string result(size, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, result.data(), size, nullptr, nullptr);
+    result.pop_back();
+    return result;
 }
 
 const std::wstring& moduleDirectory()
