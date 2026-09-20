@@ -155,15 +155,31 @@ PlayerState Engine::readPlayerState()
     state.peakVerticalSpeed = peakVerticalSpeed_;
     state.valid = true;
 
-    state.physics = reflection.field<uint8_t>(pawn, "Physics");
-    state.collidesWithWorld = reflection.flag(pawn, "bCollideWorld");
-    if (uint32_t cylinder = reflection.field<uint32_t>(pawn, "CylinderComponent"); cylinder != 0)
+    auto tryRead = [](const char* what, auto&& read)
     {
+        try
+        {
+            read();
+        }
+        catch (const std::exception& e)
+        {
+            report(what, e);
+        }
+    };
+    tryRead("the player's physics state", [&] { state.physics = reflection.field<uint8_t>(pawn, "Physics"); });
+    tryRead("the player's world collision", [&] { state.collidesWithWorld = reflection.flag(pawn, "bCollideWorld"); });
+    tryRead("the player's cylinder", [&]
+    {
+        uint32_t cylinder = reflection.field<uint32_t>(pawn, "CylinderComponent");
+        if (cylinder == 0)
+        {
+            return;
+        }
         state.collisionRadius = reflection.field<float>(cylinder, "CollisionRadius");
         state.collisionHeight = reflection.field<float>(cylinder, "CollisionHeight");
         Matrix toWorld = reflection.field<Matrix>(cylinder, "LocalToWorld");
         state.position = Float3(toWorld._41, toWorld._42, toWorld._43);
-    }
+    });
     return state;
 }
 
