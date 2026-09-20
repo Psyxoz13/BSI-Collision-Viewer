@@ -65,9 +65,10 @@ void Settings::normalize()
     playerStateKey = isKeyboardKey(playerStateKey) ? playerStateKey : defaults.playerStateKey;
 }
 
-bool isKeyboardKey(int key)
+bool isKeyboardKey(int binding)
 {
-    return key >= VK_BACK && key <= 0xFE;
+    int key = binding & Hotkey::KeyMask;
+    return (binding & ~(Hotkey::KeyMask | Hotkey::ModifierMask)) == 0 && key >= VK_BACK && key <= 0xFE;
 }
 
 Settings loadSettings(const std::wstring& path)

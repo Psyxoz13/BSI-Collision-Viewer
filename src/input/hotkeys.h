@@ -5,7 +5,7 @@
 class Hotkeys
 {
 public:
-    bool pressed(int key);
+    bool pressed(int binding);
     bool isBinding() const { return target_ != nullptr; }
     bool isBinding(const int& key) const { return target_ == &key; }
     void toggleBinding(int& key) { target_ = target_ == &key ? nullptr : &key; }

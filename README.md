@@ -18,7 +18,7 @@ The DLL lands in `build\Release\d3d11.dll`. It links the C++ runtime statically 
 
 Copy `d3d11.dll` into `Binaries\Win32` next to `BioShockInfinite.exe`; delete it to play the unmodified game again.
 
-F8 toggles the overlay, F7 opens the settings, F6 toggles the player state panel; all three keys can be changed under Hotkeys in the settings. While the settings are open the game gets no mouse or keyboard and the cursor is free.
+F8 toggles the overlay, F7 opens the settings, F6 toggles the player state panel; all three can be rebound, with Ctrl, Shift and Alt if you hold them while binding. While the settings are open the game gets no mouse or keyboard and the cursor is free.
 
 The player state panel reads the player's pawn every frame, in the game's own units. Each row is switched on separately under Rows:
 

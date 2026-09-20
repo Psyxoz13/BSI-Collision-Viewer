@@ -6,6 +6,15 @@
 
 #include <cmath>
 
+namespace Hotkey
+{
+    constexpr int KeyMask = 0xFF;
+    constexpr int Ctrl = 1 << 8;
+    constexpr int Shift = 1 << 9;
+    constexpr int Alt = 1 << 10;
+    constexpr int ModifierMask = Ctrl | Shift | Alt;
+}
+
 enum class Occlusion { None, NearestCollider, DistanceFade };
 
 enum class PlayerStateRow { Speed, Physics, WorldCollision, Cylinder, Position, Count };
@@ -57,6 +66,6 @@ struct Settings
     void normalize();
 };
 
-bool isKeyboardKey(int key);
+bool isKeyboardKey(int binding);
 Settings loadSettings(const std::wstring& path);
 void saveSettings(const Settings& settings, const std::wstring& path);
