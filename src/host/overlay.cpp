@@ -30,6 +30,7 @@ namespace
 
     std::atomic<Game*> g_game;
     std::atomic<bool> g_invalidated;
+    std::atomic<bool> g_collecting{true};
     std::mutex g_pendingMutex;
     std::unique_ptr<Scene> g_pendingScene;
 
@@ -77,6 +78,11 @@ namespace
     {
         try
         {
+            if (!g_collecting)
+            {
+                loaded.reset();
+                return;
+            }
             std::vector<ActorList> signature = game.sceneSignature();
             if (g_invalidated.exchange(false) || signature != loaded)
             {
@@ -270,6 +276,10 @@ namespace
 
     void drawInterface(ID3D11RenderTargetView* target, int characters, const PlayerState& state)
     {
+        if (!isInputLocked() && !g_settings.playerStatePanel)
+        {
+            return;
+        }
         std::lock_guard lock(g_imguiMutex);
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
@@ -317,6 +327,7 @@ namespace
     void drawFrame(IDXGISwapChain* swapChain)
     {
         handleHotkeys();
+        g_collecting = g_settings.enabled || isInputLocked();
         takePendingScene();
         if (!g_settings.enabled && !g_settings.playerStatePanel && !isInputLocked())
         {
