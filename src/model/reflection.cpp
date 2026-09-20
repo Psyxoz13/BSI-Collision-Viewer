@@ -172,6 +172,10 @@ Property Reflection::property(uint32_t structure, const char* name)
         {
             return known->second;
         }
+        if (absent_.contains(key))
+        {
+            throw UnsupportedGame(std::format("property {} was not found", name));
+        }
     }
     uint32_t owner = structure;
     for (int depth = 0; owner != 0 && depth < MaximumHierarchyDepth; depth++, owner = read<uint32_t>(owner + StructSuperOffset))
@@ -187,6 +191,10 @@ Property Reflection::property(uint32_t structure, const char* name)
                 return found;
             }
         }
+    }
+    {
+        std::lock_guard lock(mutex_);
+        absent_.insert(std::move(key));
     }
     throw UnsupportedGame(std::format("property {} was not found", name));
 }

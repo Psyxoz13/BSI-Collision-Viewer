@@ -99,6 +99,19 @@ namespace
         }
     }
 
+    bool guardedBuildStep(Game& game, std::optional<std::vector<ActorList>>& loaded)
+    {
+        __try
+        {
+            buildStep(game, loaded);
+            return true;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return false;
+        }
+    }
+
     void runWorker()
     {
         Game* game = nullptr;
@@ -122,9 +135,13 @@ namespace
         logLine("attached: " + game->describe());
         g_game = game;
         std::optional<std::vector<ActorList>> loaded;
-        for (;;)
+        for (bool faulted = false;;)
         {
-            buildStep(*game, loaded);
+            if (!guardedBuildStep(*game, loaded) && !faulted)
+            {
+                faulted = true;
+                logLine("reading the collision faulted; that scan was dropped and the game was left alone");
+            }
             Sleep(500);
         }
     }
@@ -134,8 +151,11 @@ namespace
         if (isInputLocked())
         {
             {
-                std::lock_guard lock(g_imguiMutex);
-                ImGui_ImplWin32_WndProcHandler(window, message, wParam, lParam);
+                std::unique_lock lock(g_imguiMutex, std::try_to_lock);
+                if (lock.owns_lock())
+                {
+                    ImGui_ImplWin32_WndProcHandler(window, message, wParam, lParam);
+                }
             }
             if (message == WM_INPUT || (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || (message >= WM_KEYFIRST && message <= WM_KEYLAST))
             {
@@ -407,12 +427,34 @@ namespace
         }
     }
 
+    std::atomic<bool> g_faulted;
+
+    void guardedPresentOverlay(IDXGISwapChain* swapChain)
+    {
+        __try
+        {
+            presentOverlay(swapChain);
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            g_faulted = true;
+        }
+    }
+
     using PresentFunction = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain*, UINT, UINT);
     PresentFunction g_present;
 
     HRESULT STDMETHODCALLTYPE presentHook(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags)
     {
-        presentOverlay(swapChain);
+        if (!g_faulted)
+        {
+            guardedPresentOverlay(swapChain);
+            if (g_faulted)
+            {
+                setInputLocked(false);
+                logLine("drawing the overlay faulted; it stays off for the rest of this session, the game keeps running");
+            }
+        }
         return g_present(swapChain, syncInterval, flags);
     }
 

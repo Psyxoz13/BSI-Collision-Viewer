@@ -4,6 +4,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <unordered_map>
 #include <utility>
 
@@ -56,6 +57,7 @@ private:
     std::mutex mutex_;
     std::unordered_map<int, std::string> names_;
     std::map<std::pair<uint32_t, std::string>, Property> properties_;
+    std::set<std::pair<uint32_t, std::string>> absent_;
 };
 
 std::pair<uint32_t, uint32_t> locateTables();
